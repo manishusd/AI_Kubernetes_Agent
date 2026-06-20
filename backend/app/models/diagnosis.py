@@ -8,3 +8,4 @@ class Diagnosis(BaseModel):
     kubectl_command: str = ""
     prevention_recommendation: str = ""
     confidence: int = 0
+    ai_error: str = ""

@@ -11,7 +11,7 @@ from loguru import logger
 from app.core.config import settings
 from app.models.diagnosis import Diagnosis
 
-OPENROUTER_URL = "https://api.openrouter.ai/v1/chat/completions"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "gpt-4o-mini"
 MAX_RESPONSE_TOKENS = 700
 RETRY_COUNT = 3
@@ -160,7 +160,7 @@ def _build_confidence(raw_confidence: Any) -> int:
         return int(digits.group(1)) if digits else 0
 
 
-def _fallback_diagnosis(investigation_payload: dict) -> dict:
+def _fallback_diagnosis(investigation_payload: dict, error_message: str | None = None) -> dict:
     pods = investigation_payload.get("pods", {})
     logs = investigation_payload.get("logs", {})
     deployments = investigation_payload.get("deployments", {})
@@ -188,7 +188,7 @@ def _fallback_diagnosis(investigation_payload: dict) -> dict:
         suggested_fix = "Correct the reported service, endpoint, or network policy issues."
         kubectl_command = "kubectl get svc && kubectl get endpoints"
 
-    return {
+    fallback = {
         "root_cause": root_cause,
         "explanation": "The investigation payload shows Kubernetes evidence but the AI service did not return a valid diagnosis.",
         "suggested_fix": suggested_fix,
@@ -196,6 +196,10 @@ def _fallback_diagnosis(investigation_payload: dict) -> dict:
         "prevention_recommendation": prevention_recommendation,
         "confidence": 0,
     }
+    if error_message:
+        fallback["ai_error"] = error_message
+
+    return fallback
 
 
 class AIReasoner:
@@ -211,7 +215,7 @@ class AIReasoner:
             diagnosis_data = _parse_reasoning_response(response)
         except Exception as exc:
             logger.error("AI reasoning failed: %s", exc)
-            diagnosis_data = _fallback_diagnosis(investigation_payload)
+            diagnosis_data = _fallback_diagnosis(investigation_payload, error_message=str(exc))
 
         return Diagnosis(
             root_cause=diagnosis_data.get("root_cause", ""),
@@ -220,4 +224,5 @@ class AIReasoner:
             kubectl_command=diagnosis_data.get("kubectl_command", ""),
             prevention_recommendation=diagnosis_data.get("prevention_recommendation", ""),
             confidence=_build_confidence(diagnosis_data.get("confidence", 0)),
+            ai_error=diagnosis_data.get("ai_error", ""),
         )

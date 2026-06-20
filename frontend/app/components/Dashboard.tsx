@@ -19,6 +19,7 @@ interface Diagnosis {
   kubectl_command: string;
   prevention_recommendation: string;
   confidence: number;
+  ai_error?: string;
 }
 
 interface ClusterContext {
@@ -128,7 +129,16 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        throw new Error(`Investigation failed: ${response.statusText}`);
+        let errorMessage = response.statusText;
+        try {
+          const errorPayload = await response.json();
+          if (errorPayload?.detail) {
+            errorMessage = errorPayload.detail;
+          }
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(`Investigation failed: ${errorMessage}`);
       }
 
       const payload = await response.json();
@@ -136,6 +146,10 @@ export default function Dashboard() {
 
       if (!diagnosisData) {
         throw new Error("Empty diagnosis returned from backend.");
+      }
+
+      if (diagnosisData.ai_error) {
+        setError(`AI reasoning failed: ${diagnosisData.ai_error}`);
       }
 
       setDiagnosis(diagnosisData);
