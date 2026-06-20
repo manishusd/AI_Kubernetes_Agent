@@ -160,6 +160,16 @@ def _build_confidence(raw_confidence: Any) -> int:
         return int(digits.group(1)) if digits else 0
 
 
+def _normalize_string_field(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return " ".join(str(item) for item in value)
+    if isinstance(value, dict):
+        return json.dumps(value, indent=2, sort_keys=True)
+    return str(value)
+
+
 def _fallback_diagnosis(investigation_payload: dict, error_message: str | None = None) -> dict:
     pods = investigation_payload.get("pods", {})
     logs = investigation_payload.get("logs", {})
@@ -218,11 +228,11 @@ class AIReasoner:
             diagnosis_data = _fallback_diagnosis(investigation_payload, error_message=str(exc))
 
         return Diagnosis(
-            root_cause=diagnosis_data.get("root_cause", ""),
-            explanation=diagnosis_data.get("explanation", ""),
-            suggested_fix=diagnosis_data.get("suggested_fix", ""),
-            kubectl_command=diagnosis_data.get("kubectl_command", ""),
-            prevention_recommendation=diagnosis_data.get("prevention_recommendation", ""),
+            root_cause=_normalize_string_field(diagnosis_data.get("root_cause", "")),
+            explanation=_normalize_string_field(diagnosis_data.get("explanation", "")),
+            suggested_fix=_normalize_string_field(diagnosis_data.get("suggested_fix", "")),
+            kubectl_command=_normalize_string_field(diagnosis_data.get("kubectl_command", "")),
+            prevention_recommendation=_normalize_string_field(diagnosis_data.get("prevention_recommendation", "")),
             confidence=_build_confidence(diagnosis_data.get("confidence", 0)),
-            ai_error=diagnosis_data.get("ai_error", ""),
+            ai_error=_normalize_string_field(diagnosis_data.get("ai_error", "")),
         )
