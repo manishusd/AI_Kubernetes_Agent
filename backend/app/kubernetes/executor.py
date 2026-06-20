@@ -23,13 +23,16 @@ class KubectlExecutor:
 
     DEFAULT_TIMEOUT_SECONDS = 60
 
-    def __init__(self, kubeconfig_path: str | None = None) -> None:
+    def __init__(self, kubeconfig_path: str | None = None, context: str | None = None) -> None:
         self.kubeconfig_path = kubeconfig_path or settings.kubeconfig_path or None
+        self.context = context
 
     def _build_command(self, *args: str) -> list[str]:
         command = ["kubectl"]
         if self.kubeconfig_path:
             command.extend(["--kubeconfig", self.kubeconfig_path])
+        if self.context:
+            command.extend(["--context", self.context])
         command.extend(args)
         return command
 

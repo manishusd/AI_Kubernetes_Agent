@@ -4,8 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.api.clusters import router as clusters_router
 from app.api.health import router as health_router
 from app.api.investigate import router as investigate_router
+from app.api.proxy import router as proxy_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 
@@ -34,4 +36,6 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(clusters_router)
 app.include_router(investigate_router)
+app.include_router(proxy_router)

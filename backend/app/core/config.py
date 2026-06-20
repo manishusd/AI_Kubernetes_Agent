@@ -10,7 +10,12 @@ class Settings(BaseSettings):
 
     app_name: str = "ai-kubernetes-agent"
     debug: bool = False
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
 
     openrouter_api_key: str = ""
     openrouter_model: str = ""
