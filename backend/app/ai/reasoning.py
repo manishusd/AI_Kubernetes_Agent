@@ -111,10 +111,45 @@ def _normalize_json_text(text: str) -> str:
 
 
 def _extract_fields(raw_text: str) -> dict:
+    if not isinstance(raw_text, str):
+        raw_text = str(raw_text)
+
     text = _normalize_json_text(raw_text)
     try:
         payload = json.loads(text)
-        return payload if isinstance(payload, dict) else {}
+        if isinstance(payload, dict):
+            # Normalize common field aliases returned by LLMs.
+            return {
+                "root_cause": payload.get("root_cause")
+                or payload.get("rootCause")
+                or payload.get("root cause")
+                or "",
+                "explanation": payload.get("explanation") or payload.get("analysis") or "",
+                "suggested_fix": payload.get("suggested_fix")
+                or payload.get("suggestedFix")
+                or payload.get("suggested fix")
+                or payload.get("fix")
+                or "",
+                "kubectl_command": payload.get("kubectl_command")
+                or payload.get("kubectlCommand")
+                or payload.get("kubectl command")
+                or payload.get("command")
+                or "",
+                "prevention_recommendation": payload.get("prevention_recommendation")
+                or payload.get("preventionRecommendation")
+                or payload.get("prevention recommendation")
+                or payload.get("prevention")
+                or "",
+                "confidence": payload.get("confidence")
+                or payload.get("confidence_score")
+                or payload.get("confidenceScore")
+                or payload.get("confidence_level")
+                or payload.get("confidenceLevel")
+                or payload.get("confidence_percent")
+                or payload.get("confidencePercent")
+                or 0,
+            }
+        return {}
     except json.JSONDecodeError:
         logger.warning("AI response is not valid JSON; falling back to text parsing")
 
@@ -125,7 +160,7 @@ def _extract_fields(raw_text: str) -> dict:
         "suggested_fix": r"suggested fix\s*[:=-]\s*(.+)",
         "kubectl_command": r"kubectl command[s]?\s*[:=-]\s*(.+)",
         "prevention_recommendation": r"prevention recommendation\s*[:=-]\s*(.+)",
-        "confidence": r"confidence\s*[:=-]\s*(\d+)%?",
+        "confidence": r"confidence(?:[_ ](?:score|level|percent))?\s*[:=-]\s*([\d.]+)%?",
     }
 
     for key, pattern in patterns.items():
@@ -137,6 +172,7 @@ def _extract_fields(raw_text: str) -> dict:
 
 
 def _parse_reasoning_response(response: dict) -> dict:
+    print("AI raw response:", json.dumps(response, indent=2, sort_keys=True))
     choices = response.get("choices") or []
     if not choices:
         raise ValueError("OpenRouter response contains no choices")
@@ -144,26 +180,74 @@ def _parse_reasoning_response(response: dict) -> dict:
     choice = choices[0]
     message = choice.get("message") or choice
     content = message.get("content") if isinstance(message, dict) else str(message)
+    print("AI response content:", repr(content))
     if not content:
         raise ValueError("OpenRouter response content is empty")
 
-    return _extract_fields(content)
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict):
+                text_part = part.get("text")
+                if text_part:
+                    parts.append(str(text_part))
+            elif part:
+                parts.append(str(part))
+        normalized_content = "\n".join(parts)
+    elif isinstance(content, dict):
+        normalized_content = str(content.get("text") or content)
+    else:
+        normalized_content = str(content)
+
+    return _extract_fields(normalized_content)
 
 
 def _build_confidence(raw_confidence: Any) -> int:
     if raw_confidence is None:
         return 0
-
     parsed_value: float | None = None
+
+    # Try direct numeric parse first (handles '0.8', '75', etc.)
     try:
         parsed_value = float(raw_confidence)
     except (TypeError, ValueError):
-        digits = re.search(r"(\d+)", str(raw_confidence))
-        if not digits:
-            return 0
-        parsed_value = float(digits.group(1))
+        text = str(raw_confidence).strip()
+
+        # Map common textual confidence levels to percentage values
+        text_lower = text.lower()
+        textual_map = {
+            "very high": 95,
+            "high": 80,
+            "likely": 75,
+            "moderate": 50,
+            "medium": 50,
+            "low": 20,
+            "very low": 5,
+            "unlikely": 25,
+            "unknown": 0,
+            "none": 0,
+            "certain": 95,
+            "uncertain": 20,
+        }
+
+        for key, val in textual_map.items():
+            if key in text_lower:
+                return val
+
+        # Extract percent or numeric digits from free-form text (e.g. "80%", "confidence: 0.8")
+        percent_match = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
+        if percent_match:
+            parsed_value = float(percent_match.group(1))
+        else:
+            number_match = re.search(r"(\d+(?:\.\d+)?)", text)
+            if number_match:
+                parsed_value = float(number_match.group(1))
+            else:
+                return 0
 
     # Models may return confidence as 0-1 or 0-100. Normalize to integer percent.
+    if parsed_value is None:
+        return 0
     if 0 < parsed_value <= 1:
         parsed_value *= 100
 
