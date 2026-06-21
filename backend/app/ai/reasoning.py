@@ -153,11 +153,21 @@ def _parse_reasoning_response(response: dict) -> dict:
 def _build_confidence(raw_confidence: Any) -> int:
     if raw_confidence is None:
         return 0
+
+    parsed_value: float | None = None
     try:
-        return int(float(raw_confidence))
+        parsed_value = float(raw_confidence)
     except (TypeError, ValueError):
         digits = re.search(r"(\d+)", str(raw_confidence))
-        return int(digits.group(1)) if digits else 0
+        if not digits:
+            return 0
+        parsed_value = float(digits.group(1))
+
+    # Models may return confidence as 0-1 or 0-100. Normalize to integer percent.
+    if 0 < parsed_value <= 1:
+        parsed_value *= 100
+
+    return max(0, min(100, int(round(parsed_value))))
 
 
 def _normalize_string_field(value: Any) -> str:

@@ -32,6 +32,10 @@ interface InvestigationHistoryItem {
   id: string;
   timestamp: string;
   root_cause: string;
+  explanation: string;
+  suggested_fix: string;
+  kubectl_command: string;
+  prevention_recommendation: string;
   namespace: string;
   confidence: number;
   status: string;
@@ -45,6 +49,8 @@ export default function Dashboard() {
   const [statusMessage, setStatusMessage] = useState("Waiting to start investigation.");
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [history, setHistory] = useState<InvestigationHistoryItem[]>(initialHistory);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<InvestigationHistoryItem | null>(null);
+  const [copiedTarget, setCopiedTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [clusters, setClusters] = useState<ClusterContext[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
@@ -100,12 +106,35 @@ export default function Dashboard() {
       id: `${Date.now()}`,
       timestamp: new Date().toLocaleString(),
       root_cause: diagnosis.root_cause || "Unknown",
+      explanation: diagnosis.explanation || "",
+      suggested_fix: diagnosis.suggested_fix || "",
+      kubectl_command: diagnosis.kubectl_command || "",
+      prevention_recommendation: diagnosis.prevention_recommendation || "",
       namespace: "default",
       confidence: diagnosis.confidence,
       status: diagnosis.root_cause ? "Success" : "Failed",
     };
 
     setHistory((current) => [entry, ...current].slice(0, 8));
+  };
+
+  const copyCommand = async (command: string, source: string) => {
+    if (!command.trim()) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedTarget(source);
+      setTimeout(() => setCopiedTarget((current) => (current === source ? null : current)), 1500);
+    } catch {
+      setError("Unable to copy command. Please copy it manually.");
+    }
+  };
+
+  const deleteHistoryItem = (id: string) => {
+    setHistory((current) => current.filter((item) => item.id !== id));
+    setSelectedHistoryItem((current) => (current?.id === id ? null : current));
   };
 
   const runInvestigation = async () => {
@@ -166,160 +195,382 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <header className="mb-8 flex items-center justify-between border-b border-slate-800 pb-6">
-          <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-slate-500">
-              AI Kubernetes Agent
-            </p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
-              Troubleshoot clusters with AI
-            </h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white text-slate-900">
+      <div className="mx-auto max-w-7xl px-8 py-12">
+        {/* Header */}
+        <header className="mb-12 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 shadow-lg">
+              <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">
+                Kubernetes Intelligence
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                AI Troubleshooting Agent
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">Diagnose and fix cluster issues instantly</p>
+            </div>
           </div>
-          <div className="rounded-2xl bg-slate-900 px-5 py-3 text-sm text-slate-300">
-            Logged in with InsForge
+          <div className="flex items-center gap-3 rounded-full bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-2.5 border border-blue-200">
+            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            <span className="text-sm font-medium text-blue-700">Connected to InsForge</span>
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-lg shadow-slate-950/20">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-8">
+            {/* Investigation Card */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md transition hover:shadow-lg">
+              <div className="mb-6 flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                    <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Cluster Investigation</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Analyze your Kubernetes cluster health</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6 space-y-4">
                 <div>
-                  <p className="text-sm uppercase text-slate-500">Investigation</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">Cluster Health Check</h2>
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="min-w-[220px] rounded-2xl bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
-                    <label className="block text-xs uppercase tracking-[0.25em] text-slate-500">Cluster</label>
-                    <select
-                      value={selectedCluster ?? ""}
-                      onChange={(event) => setSelectedCluster(event.target.value)}
-                      disabled={isInvestigating || loadingClusters}
-                      className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-400"
-                    >
-                      {loadingClusters ? (
-                        <option value="">Loading clusters...</option>
-                      ) : clusters.length === 0 ? (
-                        <option value="">No clusters found</option>
-                      ) : (
-                        clusters.map((cluster) => (
-                          <option key={cluster.name} value={cluster.name}>
-                            {cluster.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={runInvestigation}
-                    disabled={isInvestigating || !selectedCluster}
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Cluster</label>
+                  <select
+                    value={selectedCluster ?? ""}
+                    onChange={(event) => setSelectedCluster(event.target.value)}
+                    disabled={isInvestigating || loadingClusters}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-50 disabled:text-slate-500"
                   >
-                    {isInvestigating ? "Investigating…" : "Investigate Cluster"}
-                  </button>
+                    {loadingClusters ? (
+                      <option value="">Loading clusters...</option>
+                    ) : clusters.length === 0 ? (
+                      <option value="">No clusters found</option>
+                    ) : (
+                      clusters.map((cluster) => (
+                        <option key={cluster.name} value={cluster.name}>
+                          {cluster.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
-              </div>
 
-              <div className="mt-6 rounded-3xl bg-slate-950/90 p-5">
-                <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Status</p>
-                <p className="mt-3 text-lg font-medium text-white">{statusMessage}</p>
-                <div className="mt-5 grid gap-3">
+                <button
+                  type="button"
+                  disabled={isInvestigating || !selectedCluster}
+                  onClick={runInvestigation}
+                  className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition flex items-center justify-center gap-2 ${
+                    isInvestigating || !selectedCluster
+                      ? "bg-slate-300 cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg"
+                  }`}
+                >
                   {isInvestigating ? (
-                    progressSteps.map((step, index) => (
-                      <div
-                        key={step}
-                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${
-                          index <= progressIndex ? "bg-emerald-500/10 text-slate-100" : "bg-slate-800/80 text-slate-400"
-                        }`}
-                      >
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-emerald-400">
-                          {index <= progressIndex ? "✓" : index + 1}
-                        </span>
-                        <span className="text-sm">{step}</span>
-                      </div>
-                    ))
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Investigating...
+                    </>
                   ) : (
-                    <p className="text-sm text-slate-400">Select a cluster and start an investigation.</p>
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Start Investigation
+                    </>
                   )}
-                </div>
+                </button>
               </div>
 
-              {error ? (
-                <div className="mt-5 rounded-3xl border border-rose-500 bg-rose-500/10 p-4 text-sm text-rose-200">
-                  {error}
+              {/* Status Section */}
+              <div className="rounded-xl bg-slate-50 p-6 border border-slate-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`h-2 w-2 rounded-full ${isInvestigating ? "bg-blue-500 animate-pulse" : "bg-slate-400"}`}></div>
+                  <p className="text-sm font-semibold text-slate-700">Status: {statusMessage}</p>
                 </div>
-              ) : null}
-            </div>
 
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-lg shadow-slate-950/20">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-white">Diagnosis</h2>
-                <span className="text-sm text-slate-500">AI summary</span>
-              </div>
-
-              {diagnosis ? (
-                <div className="space-y-4 text-slate-100">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Root Cause</p>
-                    <p className="mt-2 text-base font-medium text-white">{diagnosis.root_cause}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Explanation</p>
-                    <p className="mt-2 text-base text-slate-300">{diagnosis.explanation}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Suggested Fix</p>
-                    <p className="mt-2 text-base text-slate-300">{diagnosis.suggested_fix}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Command</p>
-                    <p className="mt-2 rounded-2xl bg-slate-950/80 px-4 py-3 text-sm text-emerald-200">{diagnosis.kubectl_command}</p>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-950/80 px-4 py-3">
-                    <span className="text-sm uppercase tracking-[0.25em] text-slate-500">Confidence</span>
-                    <span className="text-lg font-semibold text-white">{diagnosis.confidence}%</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-400">Start an investigation to see the diagnosis here.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-lg shadow-slate-950/20">
-              <h2 className="text-xl font-semibold text-white">Recent Investigations</h2>
-              <p className="mt-2 text-sm text-slate-500">Latest cluster diagnoses stored locally.</p>
-
-              <div className="mt-6 space-y-3">
-                {history.length === 0 ? (
-                  <p className="text-sm text-slate-400">No recent investigations yet.</p>
-                ) : (
+                {isInvestigating ? (
                   <div className="space-y-3">
-                    {history.map((item) => (
-                      <div key={item.id} className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-medium text-white">{item.root_cause}</p>
-                          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">
-                            {item.status}
-                          </span>
+                    {progressSteps.map((step, index) => (
+                      <div key={step} className="flex items-center gap-3">
+                        <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 transition">
+                          {index < progressIndex ? (
+                            <>
+                              <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75"></div>
+                              <div className="relative rounded-full bg-emerald-500 text-white flex items-center justify-center h-7 w-7">✓</div>
+                            </>
+                          ) : index === progressIndex ? (
+                            <>
+                              <div className="absolute inset-0 rounded-full bg-blue-500 animate-pulse"></div>
+                              <div className="relative text-blue-600 font-bold">{index + 1}</div>
+                            </>
+                          ) : (
+                            index + 1
+                          )}
                         </div>
-                        <div className="mt-3 grid gap-2 text-sm text-slate-400">
-                          <p>{item.timestamp}</p>
-                          <p>Namespace: {item.namespace}</p>
-                          <p>Confidence: {item.confidence}%</p>
-                        </div>
+                        <span className={`text-sm font-medium ${index <= progressIndex ? "text-slate-900" : "text-slate-500"}`}>
+                          {step}
+                        </span>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-sm text-slate-600">Ready to investigate. Select a cluster and click start.</p>
                 )}
               </div>
+
+              {error && (
+                <div className="mt-6 rounded-lg border border-red-300 bg-red-50 p-4 flex gap-3">
+                  <svg className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold text-red-900">Investigation Failed</p>
+                    <p className="text-sm text-red-700 mt-1">{error}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Diagnosis Card */}
+            {diagnosis && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-md">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+                    <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">AI Diagnosis</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Root cause analysis and recommendations</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-6">
+                  {/* Root Cause */}
+                  <div className="rounded-lg bg-gradient-to-br from-red-50 to-orange-50 p-4 border border-red-200">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-red-700 mb-2">Root Cause</p>
+                    <p className="text-sm font-medium text-slate-900 whitespace-pre-line">{diagnosis.root_cause}</p>
+                  </div>
+
+                  {/* Explanation */}
+                  <div className="rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 p-4 border border-blue-200">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 mb-2">Explanation</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{diagnosis.explanation}</p>
+                  </div>
+
+                  {/* Suggested Fix */}
+                  <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-green-50 p-4 border border-emerald-200">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 mb-2">Suggested Fix</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{diagnosis.suggested_fix}</p>
+                  </div>
+
+                  {/* Command */}
+                  <div className="rounded-lg bg-slate-900 p-4 border border-slate-700">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3m0 0l3-3m-3 3V5m0 0H5m0 0L2 2m15 13l3 3m0 0l3-3m-3 3v-3m0 0h3m0 0l3 3" />
+                        </svg>
+                        kubectl Command
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => copyCommand(diagnosis.kubectl_command, "diagnosis")}
+                        className="rounded-md border border-slate-600 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                      >
+                        {copiedTarget === "diagnosis" ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <code className="text-xs text-emerald-400 font-mono whitespace-pre-wrap break-words">{diagnosis.kubectl_command}</code>
+                  </div>
+
+                  {/* Confidence & Prevention */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg bg-slate-100 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Confidence</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-blue-600">{diagnosis.confidence}</span>
+                        <span className="text-sm text-slate-600">%</span>
+                      </div>
+                      <div className="mt-2 h-1.5 bg-slate-300 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
+                          style={{ width: `${diagnosis.confidence}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    
+                    <div className="rounded-lg bg-slate-100 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Prevention</p>
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap">{diagnosis.prevention_recommendation.split('\n')[0] || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar - Recent Investigations */}
+          <div className="space-y-8">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md sticky top-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
+                  <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">History</h3>
+                  <p className="text-xs text-slate-600">Recent investigations</p>
+                </div>
+              </div>
+
+              {history.length === 0 ? (
+                <div className="text-center py-8">
+                  <svg className="h-12 w-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <p className="text-sm text-slate-600">No investigations yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {history.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedHistoryItem(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedHistoryItem(item);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      className="group relative w-full text-left rounded-lg border border-slate-200 bg-slate-50 p-3 pb-9 hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteHistoryItem(item.id);
+                        }}
+                        className="absolute right-2 bottom-2 inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 group-focus-within:opacity-100"
+                        aria-label="Delete history item"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h8" />
+                        </svg>
+                      </button>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{item.root_cause.split('\n')[0]}</p>
+                          <p className="text-xs text-slate-600 truncate mt-1">Fix: {item.suggested_fix?.split('\n')[0] || "N/A"}</p>
+                          <p className="text-xs text-slate-500 mt-1">{item.timestamp}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded font-semibold whitespace-nowrap flex-shrink-0 ${
+                          item.status === 'Success' 
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {item.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        <p>Confidence: <span className="font-semibold text-slate-900">{item.confidence}%</span></p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
+
+        {selectedHistoryItem && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4"
+            onClick={() => setSelectedHistoryItem(null)}
+            role="presentation"
+          >
+            <div
+              className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl max-h-[85vh] overflow-y-auto"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Investigation history details"
+            >
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">Investigation Details</h3>
+                  <p className="text-sm text-slate-600 mt-1">{selectedHistoryItem.timestamp}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedHistoryItem(null)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="rounded-lg bg-gradient-to-br from-red-50 to-orange-50 p-4 border border-red-200">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-red-700 mb-2">Root Cause</p>
+                  <p className="text-sm font-medium text-slate-900 whitespace-pre-line">{selectedHistoryItem.root_cause || "N/A"}</p>
+                </div>
+
+                <div className="rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 p-4 border border-blue-200">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 mb-2">Explanation</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{selectedHistoryItem.explanation || "N/A"}</p>
+                </div>
+
+                <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-green-50 p-4 border border-emerald-200">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 mb-2">Suggested Fix</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{selectedHistoryItem.suggested_fix || "N/A"}</p>
+                </div>
+
+                <div className="rounded-lg bg-slate-900 p-4 border border-slate-700">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">kubectl Command</p>
+                    <button
+                      type="button"
+                      onClick={() => copyCommand(selectedHistoryItem.kubectl_command, `history-${selectedHistoryItem.id}`)}
+                      className="rounded-md border border-slate-600 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                    >
+                      {copiedTarget === `history-${selectedHistoryItem.id}` ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <code className="text-xs text-emerald-400 font-mono whitespace-pre-wrap break-words">{selectedHistoryItem.kubectl_command || "N/A"}</code>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-lg bg-slate-100 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Confidence</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-blue-600">{selectedHistoryItem.confidence}</span>
+                      <span className="text-sm text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-slate-100 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Prevention</p>
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap">{selectedHistoryItem.prevention_recommendation || "N/A"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
