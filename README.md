@@ -53,6 +53,8 @@ Access:
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# If .venv came from another OS (e.g., Windows -> Linux), recreate it first:
+# rm -rf .venv && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload --port 8000
@@ -63,7 +65,7 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local
+cp .env.example .env
 npm run dev
 ```
 
@@ -81,6 +83,8 @@ KUBECONFIG_PATH=
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_INSFORGE_URL=
+NEXT_PUBLIC_INSFORGE_ANON_KEY=
 ```
 
 ## API Endpoints

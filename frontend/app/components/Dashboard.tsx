@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 const progressSteps = [
   "Checking Pods",
@@ -48,7 +48,22 @@ export default function Dashboard() {
   const [progressIndex, setProgressIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState("Waiting to start investigation.");
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
-  const [history, setHistory] = useState<InvestigationHistoryItem[]>(initialHistory);
+  const [history, setHistory] = useState<InvestigationHistoryItem[]>(() => {
+    if (typeof window === "undefined") {
+      return initialHistory;
+    }
+
+    const saved = window.localStorage.getItem("investigationHistory");
+    if (!saved) {
+      return initialHistory;
+    }
+
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return initialHistory;
+    }
+  });
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<InvestigationHistoryItem | null>(null);
   const [copiedTarget, setCopiedTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,22 +71,6 @@ export default function Dashboard() {
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [loadingClusters, setLoadingClusters] = useState(true);
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
-
-  const progressVisible = useMemo(
-    () => progressSteps.slice(0, progressIndex + 1),
-    [progressIndex]
-  );
-
-  useEffect(() => {
-    const saved = localStorage.getItem("investigationHistory");
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch {
-        setHistory(initialHistory);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("investigationHistory", JSON.stringify(history));
@@ -99,7 +98,7 @@ export default function Dashboard() {
     };
 
     loadClusters();
-  }, []);
+  }, [backendBaseUrl]);
 
   const addHistory = (diagnosis: Diagnosis) => {
     const entry: InvestigationHistoryItem = {
