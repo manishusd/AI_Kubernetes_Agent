@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { getInsforgeClient } from "../../services/insforge";
+
 const progressSteps = [
   "Checking Pods",
   "Reading Logs",
@@ -70,11 +72,63 @@ export default function Dashboard() {
   const [clusters, setClusters] = useState<ClusterContext[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [loadingClusters, setLoadingClusters] = useState(true);
+  const [isInsforgeConnected, setIsInsforgeConnected] = useState(false);
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+  const insforgeBaseUrl = process.env.NEXT_PUBLIC_INSFORGE_URL;
 
   useEffect(() => {
     localStorage.setItem("investigationHistory", JSON.stringify(history));
   }, [history]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkInsforgeConnection = async () => {
+      const client = getInsforgeClient();
+      if (!client || !insforgeBaseUrl) {
+        if (isMounted) {
+          setIsInsforgeConnected(false);
+        }
+        return;
+      }
+
+      try {
+        const [backendResponse, authConfigResult, currentUserResult] = await Promise.all([
+          fetch(`${backendBaseUrl}/health`, { cache: "no-store" }),
+          client.auth.getPublicAuthConfig(),
+          client.auth.getCurrentUser(),
+        ]);
+
+        const backendOk = backendResponse.ok;
+        const insforgeOk = !authConfigResult.error;
+        const currentUser = (currentUserResult.data as { user?: { id?: string } | null } | null)?.user;
+        const hasSession = !currentUserResult.error && !!currentUser?.id;
+
+        if (isMounted) {
+          setIsInsforgeConnected(backendOk && insforgeOk && hasSession);
+        }
+      } catch {
+        if (isMounted) {
+          setIsInsforgeConnected(false);
+        }
+      }
+    };
+
+    checkInsforgeConnection();
+
+    const intervalId = window.setInterval(checkInsforgeConnection, 30000);
+    const handleFocus = () => {
+      checkInsforgeConnection();
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [backendBaseUrl, insforgeBaseUrl]);
 
   useEffect(() => {
     const loadClusters = async () => {
@@ -215,8 +269,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-full bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-2.5 border border-blue-200">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-sm font-medium text-blue-700">Connected to InsForge</span>
+            <div className={`h-2 w-2 rounded-full ${isInsforgeConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`}></div>
+            <span className={`text-sm font-medium ${isInsforgeConnected ? "text-blue-700" : "text-blue-700"}`}>
+              {isInsforgeConnected ? "Connected to InsForge" : "Disconnected from InsForge"}
+            </span>
           </div>
         </header>
 
