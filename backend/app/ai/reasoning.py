@@ -26,6 +26,7 @@ Return the answer as valid JSON only, with exactly these keys:
 - kubectl_command
 - prevention_recommendation
 - confidence
+`confidence` must be an integer number from 0 to 100 only. Do not use words such as High/Low/Medium.
 Do not include any prose outside the JSON object.
 """
 
@@ -54,6 +55,7 @@ def build_prompt(investigation_payload: dict) -> str:
     return "\n\n".join([
         "Analyze the Kubernetes investigation payload below and provide a senior SRE diagnosis.",
         "Use the evidence from each section to correlate the failure, identify the root cause, and suggest a practical fix.",
+        "Set confidence as an integer from 0 to 100 only.",
         *parts,
         "Respond with valid JSON only. Do not add any explanation outside the JSON object.",
     ])
@@ -213,27 +215,6 @@ def _build_confidence(raw_confidence: Any) -> int:
     except (TypeError, ValueError):
         text = str(raw_confidence).strip()
 
-        # Map common textual confidence levels to percentage values
-        text_lower = text.lower()
-        textual_map = {
-            "very high": 95,
-            "high": 80,
-            "likely": 75,
-            "moderate": 50,
-            "medium": 50,
-            "low": 20,
-            "very low": 5,
-            "unlikely": 25,
-            "unknown": 0,
-            "none": 0,
-            "certain": 95,
-            "uncertain": 20,
-        }
-
-        for key, val in textual_map.items():
-            if key in text_lower:
-                return val
-
         # Extract percent or numeric digits from free-form text (e.g. "80%", "confidence: 0.8")
         percent_match = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
         if percent_match:
@@ -243,6 +224,7 @@ def _build_confidence(raw_confidence: Any) -> int:
             if number_match:
                 parsed_value = float(number_match.group(1))
             else:
+                logger.warning("Non-numeric confidence received from AI: {!r}", raw_confidence)
                 return 0
 
     # Models may return confidence as 0-1 or 0-100. Normalize to integer percent.
