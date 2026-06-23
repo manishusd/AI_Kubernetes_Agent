@@ -36,7 +36,7 @@ Build an AI-powered Kubernetes troubleshooting platform that can:
 - OpenRouter model gateway
 - Prompt-based reasoning pipeline in backend
 - InsForge framework
-InsForge is an AI-native Backend-as-a-Service (BaaS) platform designed for AI coding agents and developers. It provides backend services such as AI Model Gateway,Database,Authentication & Authorization,MCP (Model Context Protocol) integration etc.
+- InsForge is an AI-native Backend-as-a-Service (BaaS) platform designed for AI coding agents and developers. It provides backend services such as AI Model Gateway,Database,Authentication & Authorization,MCP (Model Context Protocol) integration etc.
 
 
 # High Level Architecture
