@@ -226,7 +226,7 @@ Frontend sends API request
 FastAPI Backend
       (Orchestration Layer)
                 │
-                                          ├── Receives request and orchestrates Kubernetes investigation + AI diagnosis
+                ├── Receives request and orchestrates Kubernetes investigation + AI diagnosis
                                           
                 │
                 ▼
