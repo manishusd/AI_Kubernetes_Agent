@@ -304,13 +304,13 @@ Add startup validation checks
 - Readiness/Liveness Probe Failures
 - Networking Issues
 
-## How This Helps and Saves Time
+## Business Value and Time Efficiency
 
 This platform reduces the manual troubleshooting cycle by combining evidence collection and AI reasoning in one workflow.
 
 ### Operational Benefits
 
-- Faster triage: engineers do not need to manually run and correlate multiple kubectl commands across pods, logs, events, deployments, and services.
+- Faster issue analysis: engineers do not need to manually run and correlate multiple kubectl commands across pods, logs, events, deployments, and services.
 - Consistent diagnosis quality: every investigation returns a structured root cause, suggested fix, and verification command.
 - Lower noise: pod-first gating skips unnecessary checks when pods are healthy, reducing stale or misleading signals.
 - Better collaboration: history and standardized output format make handover between shifts and teams easier.
