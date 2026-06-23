@@ -168,7 +168,7 @@ Build an AI-powered Kubernetes troubleshooting platform that can:
 │                                                            │
 │ Example UI:                                                 │
 │                                                            │
-│ Incident: Payment Service Failure                          │
+│                           │
 │                                                            │
 │ Status: Investigating...                                   │
 │                                                            │
@@ -266,8 +266,7 @@ User sees Diagnosis
 # Example Failure Flow
 
 ```text
-Issue:
-Payment service unavailable
+
 
 Agent Investigation:
 
