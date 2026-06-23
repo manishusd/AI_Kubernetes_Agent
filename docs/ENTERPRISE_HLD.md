@@ -35,7 +35,8 @@ Build an AI-powered Kubernetes troubleshooting platform that can:
 
 - OpenRouter model gateway
 - Prompt-based reasoning pipeline in backend
-- insforge framework
+- InsForge framework
+InsForge is an AI-native Backend-as-a-Service (BaaS) platform designed for AI coding agents and developers. It provides backend services such as AI Model Gateway,Database,Authentication & Authorization,MCP (Model Context Protocol) integration etc.
 
 
 # High Level Architecture
@@ -316,10 +317,5 @@ This platform reduces the manual troubleshooting cycle by combining evidence col
 
 ### Time-Saving Impact (Typical Incident)
 
-| Stage | Manual Process | With AI Kubernetes Agent |
-|---|---:|---:|
-| Initial data collection | 10-20 min | 1-3 min |
-| Correlation and root cause identification | 15-30 min | 3-8 min |
-| First actionable fix recommendation | 10-15 min | <2 min |
+In complex scenarios with many Kubernetes workloads, manual investigation can take up to half a day to collect evidence, correlate logs/events, and isolate the real root cause. With this agent, the same troubleshooting path is reduced to minutes by automating cross-resource checks and generating a focused diagnosis quickly.
 
-Expected outcome: significant MTTR reduction, quicker first response, and more predictable troubleshooting outcomes across environments.
