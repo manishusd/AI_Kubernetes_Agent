@@ -226,7 +226,8 @@ Frontend sends API request
 FastAPI Backend
       (Orchestration Layer)
                 │
-              ├── Validate authenticated user context (InsForge-backed session)
+                                          ├── Receives request and orchestrates Kubernetes investigation + AI diagnosis
+                                          
                 │
                 ▼
 Investigation Layer
