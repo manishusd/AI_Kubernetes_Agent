@@ -24,6 +24,8 @@ interface Diagnosis {
   ai_error?: string;
 }
 
+type Severity = "Critical" | "Warning" | "Healthy";
+
 interface ClusterContext {
   name: string;
   cluster: string;
@@ -40,7 +42,7 @@ interface InvestigationHistoryItem {
   prevention_recommendation: string;
   namespace: string;
   confidence: number;
-  status: string;
+  severity: Severity;
 }
 
 const initialHistory: InvestigationHistoryItem[] = [];
@@ -154,7 +156,60 @@ export default function Dashboard() {
     loadClusters();
   }, [backendBaseUrl]);
 
+  const inferSeverity = (diagnosis: Diagnosis): Severity => {
+    const rootCause = (diagnosis.root_cause || "").toLowerCase();
+    const explanation = (diagnosis.explanation || "").toLowerCase();
+    const combined = `${rootCause} ${explanation}`;
+
+    if (
+      rootCause.includes("no active kubernetes issue detected")
+      || combined.includes("no critical kubernetes issues detected")
+      || /\bhealthy\b/.test(combined)
+    ) {
+      return "Healthy";
+    }
+
+    const criticalSignals = [
+      "crashloopbackoff",
+      "imagepullbackoff",
+      "errimagepull",
+      "oomkilled",
+      "failed",
+      "failure",
+      "network",
+      "unhealthy",
+      "backoff",
+      "timeout",
+      "unavailable",
+    ];
+
+    if (diagnosis.ai_error || criticalSignals.some((signal) => combined.includes(signal))) {
+      return "Critical";
+    }
+
+    return "Warning";
+  };
+
+  const severityClasses: Record<Severity, string> = {
+    Critical: "bg-red-100 text-red-700 border border-red-200",
+    Warning: "bg-amber-100 text-amber-700 border border-amber-200",
+    Healthy: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+  };
+
+  const diagnosisCardClasses: Record<Severity, string> = {
+    Critical: "from-red-50 to-orange-50 border-red-200",
+    Warning: "from-amber-50 to-yellow-50 border-amber-200",
+    Healthy: "from-emerald-50 to-green-50 border-emerald-200",
+  };
+
+  const diagnosisLabelClasses: Record<Severity, string> = {
+    Critical: "text-red-700",
+    Warning: "text-amber-700",
+    Healthy: "text-emerald-700",
+  };
+
   const addHistory = (diagnosis: Diagnosis) => {
+    const severity = inferSeverity(diagnosis);
     const entry: InvestigationHistoryItem = {
       id: `${Date.now()}`,
       timestamp: new Date().toLocaleString(),
@@ -165,7 +220,7 @@ export default function Dashboard() {
       prevention_recommendation: diagnosis.prevention_recommendation || "",
       namespace: "default",
       confidence: diagnosis.confidence,
-      status: diagnosis.root_cause ? "Success" : "Failed",
+      severity,
     };
 
     setHistory((current) => [entry, ...current].slice(0, 8));
@@ -246,6 +301,8 @@ export default function Dashboard() {
       setIsInvestigating(false);
     }
   };
+
+  const diagnosisSeverity = diagnosis ? inferSeverity(diagnosis) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-white text-slate-900">
@@ -408,12 +465,17 @@ export default function Dashboard() {
                     <h2 className="text-lg font-semibold text-slate-900">AI Diagnosis</h2>
                     <p className="mt-0.5 text-sm text-slate-600">Root cause analysis and recommendations</p>
                   </div>
+                  <span className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ${severityClasses[diagnosisSeverity || "Warning"]}`}>
+                    {diagnosisSeverity}
+                  </span>
                 </div>
 
                 <div className="grid gap-6">
                   {/* Root Cause */}
-                  <div className="rounded-lg bg-gradient-to-br from-red-50 to-orange-50 p-4 border border-red-200">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-red-700 mb-2">Root Cause</p>
+                  <div className={`rounded-lg bg-gradient-to-br p-4 border ${diagnosisCardClasses[diagnosisSeverity || "Warning"]}`}>
+                    <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${diagnosisLabelClasses[diagnosisSeverity || "Warning"]}`}>
+                      Root Cause
+                    </p>
                     <p className="text-sm font-medium text-slate-900 whitespace-pre-line">{diagnosis.root_cause}</p>
                   </div>
 
@@ -532,12 +594,8 @@ export default function Dashboard() {
                           <p className="text-xs text-slate-600 truncate mt-1">Fix: {item.suggested_fix?.split('\n')[0] || "N/A"}</p>
                           <p className="text-xs text-slate-500 mt-1">{item.timestamp}</p>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded font-semibold whitespace-nowrap flex-shrink-0 ${
-                          item.status === 'Success' 
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {item.status}
+                        <span className={`text-xs px-2 py-1 rounded font-semibold whitespace-nowrap flex-shrink-0 ${severityClasses[item.severity]}`}>
+                          {item.severity}
                         </span>
                       </div>
                       <div className="text-xs text-slate-600">

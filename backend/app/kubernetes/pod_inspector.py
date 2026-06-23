@@ -57,6 +57,19 @@ class PodInspector:
     def _detect_pod_issue(self, pod: dict) -> str | None:
         status = pod.get("status", {})
         phase = status.get("phase", "")
+        container_statuses = status.get("containerStatuses", [])
+        init_container_statuses = status.get("initContainerStatuses", [])
+
+        # If pod is running and all app containers are ready, treat it as healthy.
+        # This avoids false positives from historical restart reasons in lastState.
+        if phase == "Running" and container_statuses:
+            all_ready = all(container.get("ready", False) for container in container_statuses)
+            if all_ready:
+                for container_status in [*container_statuses, *init_container_statuses]:
+                    issue = self._inspect_current_container_state(container_status, pod)
+                    if issue:
+                        return issue
+                return None
 
         if phase == "Pending":
             return "Pending"
@@ -64,12 +77,12 @@ class PodInspector:
         if phase in {"Failed", "Unknown"}:
             return phase
 
-        for container_status in status.get("containerStatuses", []):
+        for container_status in container_statuses:
             issue = self._inspect_container_status(container_status, pod)
             if issue:
                 return issue
 
-        for container_status in status.get("initContainerStatuses", []):
+        for container_status in init_container_statuses:
             issue = self._inspect_container_status(container_status, pod)
             if issue:
                 return issue
@@ -77,6 +90,15 @@ class PodInspector:
         return None
 
     def _inspect_container_status(self, container_status: dict, pod: dict) -> str | None:
+        issue = self._inspect_current_container_state(container_status, pod)
+        if issue:
+            return issue
+
+        # Do not treat historical lastState as an active issue for otherwise healthy pods.
+        # lastState often contains previous crash reasons even after recovery.
+        return None
+
+    def _inspect_current_container_state(self, container_status: dict, pod: dict) -> str | None:
         state = container_status.get("state", {})
         waiting = state.get("waiting", {})
         waiting_reason = waiting.get("reason", "")
@@ -86,7 +108,7 @@ class PodInspector:
                 return None
             return waiting_reason
 
-        terminated = container_status.get("lastState", {}).get("terminated", {})
+        terminated = state.get("terminated", {})
         terminated_reason = terminated.get("reason", "")
         if terminated_reason in PROBLEMATIC_STATUSES:
             return terminated_reason
