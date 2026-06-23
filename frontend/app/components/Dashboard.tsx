@@ -164,7 +164,7 @@ export default function Dashboard() {
     if (
       rootCause.includes("no active kubernetes issue detected")
       || combined.includes("no critical kubernetes issues detected")
-      || combined.includes("healthy")
+      || /\bhealthy\b/.test(combined)
     ) {
       return "Healthy";
     }

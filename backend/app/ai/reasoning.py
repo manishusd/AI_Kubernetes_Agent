@@ -174,7 +174,7 @@ def _extract_fields(raw_text: str) -> dict:
 
 
 def _parse_reasoning_response(response: dict) -> dict:
-    print("AI raw response:", json.dumps(response, indent=2, sort_keys=True))
+    # print("AI raw response:", json.dumps(response, indent=2, sort_keys=True))
     choices = response.get("choices") or []
     if not choices:
         raise ValueError("OpenRouter response contains no choices")
